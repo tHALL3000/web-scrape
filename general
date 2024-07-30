@@ -1,0 +1,64 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from bs4 import BeautifulSoup
+import csv
+import time
+
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=chrome_options)
+
+def scrape_url(driver, url):
+    try:
+        driver.get(url)
+        time.sleep(5)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        
+        title = soup.find('h1', class_='product-title').text.strip() if soup.find('h1', class_='product-title') else ''
+        price = soup.find('span', class_='price').text.strip() if soup.find('span', class_='price') else ''
+        description = soup.find('div', class_='product-description').text.strip() if soup.find('div', class_='product-description') else ''
+        
+        return f"{title}\n{price}\n{description}"
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+        return None
+
+def read_urls_from_csv(filename):
+    urls = []
+    with open(filename, 'r', newline='', encoding='utf-8') as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader)  # Skip header row
+        for row in reader:
+            if row and row[0]:
+                urls.append(row[0])
+    print(f"Total URLs found: {len(urls)}")
+    return urls
+
+def main():
+    urls = read_urls_from_csv('input_urls.csv')
+    print(f"First few URLs: {urls[:5]}")
+    driver = setup_driver()
+    results = []
+    
+    for url in urls:
+        text = scrape_url(driver, url)
+        if text:
+            results.append({'url': url, 'text': text})
+    
+    driver.quit()
+    
+    with open('scraped_data.csv', 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['url', 'text']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in results:
+            writer.writerow(row)
+    
+    print("Scraping completed. Results saved to 'scraped_data.csv'.")
+
+if __name__ == "__main__":
+    main()
